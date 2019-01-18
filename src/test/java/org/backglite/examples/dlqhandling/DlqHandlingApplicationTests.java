@@ -27,9 +27,10 @@ public class DlqHandlingApplicationTests {
 
     @Test
     public void errorObjectHandling() throws InterruptedException {
-        Message<String> message = MessageBuilder.withPayload("foo").build();
+        Message<OtherPOJO> message = MessageBuilder.withPayload(new OtherPOJO("foo")).build();
         testOutputObjectChannel.send(message);
 
         Thread.currentThread().sleep(60000);
     }
+
 }

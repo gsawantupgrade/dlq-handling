@@ -62,10 +62,17 @@
         </constructor-arg>
     </bean>
 
+    <bean id="allHeaderMapper" class="org.springframework.integration.amqp.support.DefaultAmqpHeaderMapper">
+        <constructor-arg name="requestHeaderNames" value="*"/>
+        <constructor-arg name="replyHeaderNames" value="!x-*, *"/>
+    </bean>
     <bean id="inputObjectDlqChannel" class="org.springframework.integration.amqp.channel.PollableAmqpChannel">
         <constructor-arg name="channelName" value="inputObjectDlqChannel"/>
         <constructor-arg name="amqpTemplate" ref="amqpTemplate"/>
+        <constructor-arg name="outboundMapper" ref="allHeaderMapper"/>
+        <constructor-arg name="inboundMapper" ref="allHeaderMapper"/>
         <property name="queueName" value="#{dlqQueueName}"/>
+        <property name="extractPayload" value="true"/>
     </bean>
 
     <int-amqp:outbound-channel-adapter channel="outputObjectRetryChannel"
