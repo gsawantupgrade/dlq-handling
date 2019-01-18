@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:int="http://www.springframework.org/schema/integration"
+       xmlns="http://www.springframework.org/schema/beans"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/integration http://www.springframework.org/schema/integration/spring-integration.xsd">
+
+    <int:poller id="defaultPoller" default="true" fixed-delay="50"/>
+
+    <int:logging-channel-adapter channel="errorChannel"
+                                 level="ERROR"
+                                 log-full-message="true"/>
+
+    <int:channel id="inputObjectChannel"/>
+
+    <int:chain id="inputObjectChain" input-channel="inputObjectChannel">
+        <int:filter expression="payload instanceof T(org.backglite.examples.dlqhandling.SimplePOJO)"
+                    throw-exception-on-rejection="true"/>
+        <int:logging-channel-adapter/>
+    </int:chain>
+</beans>

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:int="http://www.springframework.org/schema/integration"
+       xmlns="http://www.springframework.org/schema/beans"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/integration http://www.springframework.org/schema/integration/spring-integration.xsd">
+
+    <int:channel id="delayedObjectDlqChannel">
+        <int:interceptors>
+            <int:wire-tap channel="loggingObjectDlqChannel"/>
+        </int:interceptors>
+    </int:channel>
+    <int:channel id="inputObjectRetryChannel"/>
+    <int:channel id="outputObjectRetryChannel">
+        <int:interceptors>
+            <int:wire-tap channel="loggingObjectRetryChannel"/>
+        </int:interceptors>
+    </int:channel>
+    <int:channel id="inputObjectParkingLotChannel"/>
+    <int:channel id="outputObjectParkingLotChannel">
+        <int:interceptors>
+            <int:wire-tap channel="loggingObjectParkingLotChannel"/>
+        </int:interceptors>
+    </int:channel>
+
+    <int:chain input-channel="inputObjectDlqChannel">
+        <int:poller fixed-delay="${dlq.retries_delay}" receive-timeout="-1" max-messages-per-poll="500"/>
+        <int:header-enricher>
+            <int:header name="x-retries" overwrite="true" type="int"
+                        expression="headers['x-retries'] != null ? headers['x-retries'] + 1 : 0"/>
+        </int:header-enricher>
+        <int:header-filter header-names="x-death"/>
+        <int:router expression="headers['x-retries'] lt ${dlq.max_retries}">
+            <int:mapping value="true" channel="inputObjectRetryChannel"/>
+            <int:mapping value="false" channel="inputObjectParkingLotChannel"/>
+        </int:router>
+    </int:chain>
+
+    <int:bridge input-channel="inputObjectRetryChannel" output-channel="outputObjectRetryChannel">
+    </int:bridge>
+
+    <int:bridge input-channel="inputObjectParkingLotChannel" output-channel="outputObjectParkingLotChannel">
+    </int:bridge>
+
+    <int:logging-channel-adapter id="loggingObjectRetryChannel"
+                                 expression="'Resending message from DLQ to be reprocessed. '
+                                 + 'x-retries=' + headers['x-retries'] + '; payload=' + payload"/>
+    <int:logging-channel-adapter id="loggingObjectParkingLotChannel" level="FATAL"
+                                 expression="'Message reached max retries. Resending it to the parking lot. '
+	                             + 'x-retries=' + headers['x-retries'] + '; payload=' + payload"/>
+    <int:logging-channel-adapter id="loggingObjectDlqChannel"
+                                 expression="'Processing message from DLQ. payload=' + payload"/>
+
+</beans>

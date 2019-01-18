@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:int-amqp="http://www.springframework.org/schema/integration/amqp"
+       xmlns:rabbit="http://www.springframework.org/schema/rabbit"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/rabbit http://www.springframework.org/schema/rabbit/spring-rabbit.xsd
+        http://www.springframework.org/schema/integration/amqp http://www.springframework.org/schema/integration/amqp/spring-integration-amqp.xsd">
+
+    <bean id="mainQueueName" class="java.lang.String">
+        <constructor-arg value="#{'org.backglite.examples.dlqh'}"/>
+    </bean>
+    <bean id="dlqQueueName" class="java.lang.String">
+        <constructor-arg value="#{mainQueueName}.dlq"/>
+    </bean>
+    <bean id="parkingLotQueueName" class="java.lang.String">
+        <constructor-arg value="#{mainQueueName}.parkingLot"/>
+    </bean>
+
+    <bean id="jsonMessageConverter" class="org.springframework.amqp.support.converter.Jackson2JsonMessageConverter"/>
+
+    <rabbit:connection-factory id="rabbitConnectionFactory"
+                               host="${spring.rabbitmq.host}"
+                               port="${spring.rabbitmq.port}"
+                               username="${spring.rabbitmq.username}"
+                               password="${spring.rabbitmq.password}"/>
+
+    <rabbit:template id="amqpTemplate"
+                     connection-factory="rabbitConnectionFactory"
+                     message-converter="jsonMessageConverter"
+                     exchange="amq.direct"/>
+
+    <rabbit:queue id="objectQueue" name="#{mainQueueName}" durable="false" auto-delete="true">
+        <rabbit:queue-arguments>
+            <entry key="x-dead-letter-exchange" value="amq.direct"/>
+            <entry key="x-dead-letter-routing-key" value="#{dlqQueueName}"/>
+        </rabbit:queue-arguments>
+    </rabbit:queue>
+    <rabbit:queue id="dlqQueue" name="#{dlqQueueName}" durable="false" auto-delete="true"/>
+    <rabbit:queue id="parkingLotQueue" name="#{parkingLotQueueName}" durable="false" auto-delete="true"/>
+
+    <rabbit:direct-exchange name="amq.direct">
+        <rabbit:bindings>
+            <rabbit:binding queue="objectQueue"
+                            key="#{mainQueueName}"/>
+            <rabbit:binding queue="dlqQueue"
+                            key="#{dlqQueueName}"/>
+            <rabbit:binding queue="parkingLotQueue"
+                            key="#{parkingLotQueueName}"/>
+        </rabbit:bindings>
+    </rabbit:direct-exchange>
+
+    <int-amqp:inbound-channel-adapter channel="inputObjectChannel"
+                                      queue-names="#{mainQueueName}"
+                                      connection-factory="rabbitConnectionFactory"
+                                      message-converter="jsonMessageConverter"
+                                      mapped-request-headers="*"
+                                      error-handler="allCauseFatalRejectingErrorHandler"/>
+    <bean id="allCauseFatalRejectingErrorHandler"
+          class="org.springframework.amqp.rabbit.listener.ConditionalRejectingErrorHandler">
+        <constructor-arg name="exceptionStrategy">
+            <bean class="org.backglite.examples.dlqhandling.AllCauseFatalExceptionStrategy"/>
+        </constructor-arg>
+    </bean>
+
+    <bean id="inputObjectDlqChannel" class="org.springframework.integration.amqp.channel.PollableAmqpChannel">
+        <constructor-arg name="channelName" value="inputObjectDlqChannel"/>
+        <constructor-arg name="amqpTemplate" ref="amqpTemplate"/>
+        <property name="queueName" value="#{dlqQueueName}"/>
+    </bean>
+
+    <int-amqp:outbound-channel-adapter channel="outputObjectRetryChannel"
+                                       amqp-template="amqpTemplate"
+                                       routing-key="#{mainQueueName}"
+                                       mapped-request-headers="*"/>
+
+    <int-amqp:outbound-channel-adapter channel="outputObjectParkingLotChannel"
+                                       amqp-template="amqpTemplate"
+                                       routing-key="#{parkingLotQueueName}"
+                                       mapped-request-headers="*"/>
+</beans>
