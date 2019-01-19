@@ -28,6 +28,9 @@
                      connection-factory="rabbitConnectionFactory"
                      message-converter="jsonMessageConverter"
                      exchange="amq.direct"/>
+    <rabbit:template id="noConverterTemplate"
+                     connection-factory="rabbitConnectionFactory"
+                     exchange="amq.direct"/>
 
     <rabbit:queue id="objectQueue" name="#{mainQueueName}" durable="false" auto-delete="true">
         <rabbit:queue-arguments>
@@ -66,22 +69,22 @@
         <constructor-arg name="requestHeaderNames" value="*"/>
         <constructor-arg name="replyHeaderNames" value="!x-*, *"/>
     </bean>
-    <bean id="inputObjectDlqChannel" class="org.springframework.integration.amqp.channel.PollableAmqpChannel">
+    <bean id="inputDlqChannel" class="org.springframework.integration.amqp.channel.PollableAmqpChannel">
         <constructor-arg name="channelName" value="inputObjectDlqChannel"/>
-        <constructor-arg name="amqpTemplate" ref="amqpTemplate"/>
+        <constructor-arg name="amqpTemplate" ref="noConverterTemplate"/>
         <constructor-arg name="outboundMapper" ref="allHeaderMapper"/>
         <constructor-arg name="inboundMapper" ref="allHeaderMapper"/>
         <property name="queueName" value="#{dlqQueueName}"/>
         <property name="extractPayload" value="true"/>
     </bean>
 
-    <int-amqp:outbound-channel-adapter channel="outputObjectRetryChannel"
-                                       amqp-template="amqpTemplate"
+    <int-amqp:outbound-channel-adapter channel="outputRetryChannel"
+                                       amqp-template="noConverterTemplate"
                                        routing-key="#{mainQueueName}"
                                        mapped-request-headers="*"/>
 
-    <int-amqp:outbound-channel-adapter channel="outputObjectParkingLotChannel"
-                                       amqp-template="amqpTemplate"
+    <int-amqp:outbound-channel-adapter channel="outputParkingLotChannel"
+                                       amqp-template="noConverterTemplate"
                                        routing-key="#{parkingLotQueueName}"
                                        mapped-request-headers="*"/>
 </beans>
