@@ -28,9 +28,6 @@
                      connection-factory="rabbitConnectionFactory"
                      message-converter="jsonMessageConverter"
                      exchange="amq.direct"/>
-    <rabbit:template id="noConverterTemplate"
-                     connection-factory="rabbitConnectionFactory"
-                     exchange="amq.direct"/>
 
     <rabbit:queue id="objectQueue" name="#{mainQueueName}" durable="false" auto-delete="true">
         <rabbit:queue-arguments>
@@ -71,7 +68,7 @@
     </bean>
     <bean id="inputDlqChannel" class="org.springframework.integration.amqp.channel.PollableAmqpChannel">
         <constructor-arg name="channelName" value="inputObjectDlqChannel"/>
-        <constructor-arg name="amqpTemplate" ref="noConverterTemplate"/>
+        <constructor-arg name="amqpTemplate" ref="amqpTemplate"/>
         <constructor-arg name="outboundMapper" ref="allHeaderMapper"/>
         <constructor-arg name="inboundMapper" ref="allHeaderMapper"/>
         <property name="queueName" value="#{dlqQueueName}"/>
@@ -79,12 +76,12 @@
     </bean>
 
     <int-amqp:outbound-channel-adapter channel="outputRetryChannel"
-                                       amqp-template="noConverterTemplate"
+                                       amqp-template="amqpTemplate"
                                        routing-key="#{mainQueueName}"
                                        mapped-request-headers="*"/>
 
     <int-amqp:outbound-channel-adapter channel="outputParkingLotChannel"
-                                       amqp-template="noConverterTemplate"
+                                       amqp-template="amqpTemplate"
                                        routing-key="#{parkingLotQueueName}"
                                        mapped-request-headers="*"/>
 </beans>
